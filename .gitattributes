@@ -1,0 +1,12 @@
+# Terapkan konversi otomatis dengan aman
+* text=auto
+
+# Paksa file tertentu tetap pakai LF (Unix style) meskipun di Windows
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.yml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.ts text eol=lf
