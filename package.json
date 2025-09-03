@@ -28,11 +28,13 @@
         "date-fns": "^4.1.0",
         "dotenv": "^16.6.1",
         "express": "^4.21.2",
+        "express-rate-limit": "^8.0.1",
         "express-session": "^1.18.1",
         "joi": "^17.13.3",
         "jsonwebtoken": "^9.0.2",
         "multer": "^2.0.1",
         "mysql2": "^3.14.1",
+        "node-cron": "^4.2.1",
         "nodemailer": "^7.0.4",
         "sequelize": "^6.37.7",
         "socket.io": "^4.8.1",
@@ -40,7 +42,8 @@
         "swagger-jsdoc": "^6.2.8",
         "swagger-ui-express": "^5.0.1",
         "ua-parser-js": "^2.0.4",
-        "uuidv7": "^1.0.2"
+        "uuidv7": "^1.0.2",
+        "winston": "^3.17.0"
     },
     "directories": {
         "test": "test"

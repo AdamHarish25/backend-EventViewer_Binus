@@ -142,7 +142,7 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
     }
 };
 
-export const handleDeleteEvent = async (eventId, EventModel) => {
+export const handleDeleteEvent = async (eventId, adminId, EventModel) => {
     try {
         const result = await sequelize.transaction(async (t) => {
             const event = await EventModel.findOne({

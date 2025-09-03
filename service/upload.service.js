@@ -33,7 +33,7 @@ export const deleteEvent = async (folderPath) => {
 
 export const deleteImage = async (imagePublicId) => {
     try {
-        const result = await cloudinary.uploader.destroy(imagePublicId);
+        const result = imagePublicId ? await cloudinary.uploader.destroy(imagePublicId) : null;
         console.log(
             `File dengan public_id: ${imagePublicId} berhasil dihapus.`
         );
@@ -43,3 +43,5 @@ export const deleteImage = async (imagePublicId) => {
         throw error;
     }
 };
+
+

@@ -220,10 +220,10 @@ export const updateEventSchema = baseEventSchema;
 const uuidV7Regex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export const paramsSchema = Joi.object({
-    id: Joi.string().pattern(uuidV7Regex).required().messages({
-        "string.pattern.base": "Parameter 'id' tidak valid",
-        "any.required": "Parameter 'id' wajib diisi",
+export const eventParamsSchema = Joi.object({
+    eventId: Joi.string().pattern(uuidV7Regex).required().messages({
+        "string.pattern.base": "Parameter 'eventId' tidak valid",
+        "any.required": "Parameter 'eventId' wajib diisi",
     }),
 });
 

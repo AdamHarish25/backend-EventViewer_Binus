@@ -43,7 +43,7 @@ export const createEvent = async (req, res, next) => {
 
 export const deleteEvent = async (req, res, next) => {
     try {
-        await handleDeleteEvent(req.params.id, db.Event);
+        await handleDeleteEvent(req.params.eventId, req.user.id, db.Event);
 
         res.status(200).json({
             status: "success",
@@ -114,7 +114,7 @@ export const rejectEvent = async (req, res, next) => {
     };
 
     try {
-        const eventId = req.params.id;
+        const eventId = req.params.eventId;
         const superAdminId = req.user.id;
 
         console.log(
@@ -144,7 +144,7 @@ export const approveEvent = async (req, res, next) => {
     };
 
     try {
-        const eventId = req.params.id;
+        const eventId = req.params.eventId;
         const superAdminId = req.user.id;
 
         console.log(
