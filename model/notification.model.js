@@ -45,6 +45,9 @@ const notificationModel = (sequelize, DataTypes) => {
             notificationType: {
                 type: DataTypes.ENUM(
                     "event_created",
+                    "event_updated",
+                    "event_deleted",
+                    "event_pending",
                     "event_revised",
                     "event_approved",
                     "event_rejected"

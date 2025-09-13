@@ -21,7 +21,6 @@ export const register = async (req, res) => {
         return res.status(201).json({ message: "user Created", data: newUser });
     } catch (error) {
         console.error(error);
-        return res.status(400).json({ message: error.message || "Register failed" });
     }
 };
 
@@ -51,8 +50,6 @@ export const login = async (req, res, next) => {
         res.status(200).json({
             message: "Login Success !",
             userId: user.id,
-            firstName: user.name,
-            email: user.email,
             role: user.role,
             accessToken,
         });

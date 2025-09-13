@@ -8,6 +8,7 @@ import { saveOTPToDatabase } from "../service/otp.service.js";
 import { generateOTP } from "../utils/otpGenerator.js";
 import AppError from "../utils/AppError.js";
 import db from "../model/index.js";
+import logger from "../utils/logger.js";
 
 dotenv.config({ path: "../.env" });
 
@@ -45,7 +46,7 @@ export const handleUserLogin = async (data, model, deviceName) => {
 
     const userProfile = {
         id: user.id,
-        name: user.name,
+        name: `${user.firstName} ${user.lastName}`,
         email: user.email,
         role: user.role,
     };
@@ -161,7 +162,7 @@ export const requestPasswordReset = async (email, model) => {
             await sendOTPEmail(mailOptions, email);
         });
     } catch (error) {
-        console.error(
+        logger.error(
             `[TRANSACTION_FAILED] Gagal memproses OTP untuk ${email}.`,
             {
                 errorMessage: error.message,
@@ -187,23 +188,6 @@ export const requestPasswordReset = async (email, model) => {
     }
 };
 
-// export const requestPasswordReset = async (email, model) => {
-//     const user = await model.UserModel.findOne({
-//         where: { email },
-//     });
-
-//     if (!user || user.length === 0) {
-//         throw new AppError("Email tidak terdaftar", 404, "CLIENT_AUTH_ERROR");
-//     }
-
-//     const otp = generateOTP();
-
-//     // Ga ada yang jamin OTP berhasil disimpan ke db dan dikirim ke user
-//     // Butuh penganganan lebih
-//     await saveOTPToDatabase(user, otp, model);
-//     await sendOTPEmail(email, otp);
-// };
-
 export const resetPasswordHandler = async (
     user,
     newPassword,
@@ -228,7 +212,7 @@ export const resetPasswordHandler = async (
         const isMatch = await bcrypt.compare(resetToken, dataRow.token);
 
         if (isMatch) {
-            console.log("Token cocok! Data ditemukan.");
+            logger.info("Token cocok! Data ditemukan.");
             matchedData = dataRow;
             break;
         }

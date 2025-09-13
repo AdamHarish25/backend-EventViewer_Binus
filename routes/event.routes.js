@@ -138,7 +138,7 @@ router.get(
  *                   type: string
  *                   example: Event Successly Created
  *       400:
- *         description: Bad Request (misal: ukuran file terlalu besar).
+ *         description: "Bad Request (misal: ukuran file terlalu besar)."
  *       401:
  *         description: Unauthorized atau data tidak valid.
  *       403:

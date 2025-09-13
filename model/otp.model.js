@@ -42,7 +42,7 @@ const OTPModel = (sequelize, DataTypes) => {
         },
         {
             tableName: "otps",
-            timestamps: false,
+            timestamps: true,
             indexes: [
                 {
                     name: "otp_verification_idx",

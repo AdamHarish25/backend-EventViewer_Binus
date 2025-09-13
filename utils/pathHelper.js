@@ -3,7 +3,6 @@ export const generateEventAssetPaths = (eventId) => {
     const mainEventFolderPath = `events/${eventId}`;
 
     return {
-        mainEventFolderPath,
         fullFolderPath: `${mainEventFolderPath}/${assetCategory}`,
         fileName: `${Date.now()}`,
     };

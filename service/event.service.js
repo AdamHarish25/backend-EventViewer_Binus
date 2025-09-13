@@ -1,19 +1,21 @@
 import { uuidv7 } from "uuidv7";
-import { startOfToday, isToday, isThisWeek } from "date-fns";
+import { startOfToday, endOfToday, endOfWeek } from "date-fns";
 import { Op } from "sequelize";
 import AppError from "../utils/AppError.js";
 import { generateEventAssetPaths } from "../utils/pathHelper.js";
-import { uploadPosterImage, deleteImage } from "./upload.service.js";
+import {
+    uploadPosterImage,
+    deleteSingleFile,
+    deleteEventFolder,
+} from "./upload.service.js";
 import { sequelize } from "../config/dbconfig.js";
 import socketService from "../socket/index.js";
+import logger from "../utils/logger.js";
 
-export const getCategorizedEventsService = async (EventModel) => {
+export const getCategorizedEventsService = async ({ EventModel }) => {
     try {
-        const allUpcomingEvents = await EventModel.findAll({
-            where: {
-                date: { [Op.gte]: startOfToday() },
-                status: "approved",
-            },
+        const commonOptions = {
+            where: { status: "approved" },
             order: [
                 ["date", "ASC"],
                 ["startTime", "ASC"],
@@ -28,35 +30,85 @@ export const getCategorizedEventsService = async (EventModel) => {
                 "speaker",
                 "imageUrl",
             ],
+        };
+
+        const today = new Date();
+
+        const [currentEvents, thisWeekEvents, nextEvents] = await Promise.all([
+            // Current Events
+            EventModel.findAll({
+                ...commonOptions,
+                where: {
+                    ...commonOptions.where,
+                    date: { [Op.eq]: startOfToday() },
+                },
+            }),
+
+            // This Week Events
+            EventModel.findAll({
+                ...commonOptions,
+                where: {
+                    ...commonOptions.where,
+                    date: {
+                        [Op.gt]: endOfToday(),
+                        [Op.lte]: endOfWeek(today, { weekStartsOn: 1 }),
+                    },
+                },
+            }),
+
+            // Next Event
+            EventModel.findAll({
+                ...commonOptions,
+                where: {
+                    ...commonOptions.where,
+                    date: {
+                        [Op.gt]: endOfWeek(today, { weekStartsOn: 1 }),
+                    },
+                },
+            }),
+        ]);
+
+        return {
+            current: currentEvents,
+            thisWeek: thisWeekEvents,
+            next: nextEvents,
+        };
+    } catch (error) {
+        logger.error("Gagal mengambil data event terkategori:", error);
+        throw error;
+    }
+};
+
+export const getPaginatedEventsService = async (options) => {
+    const { userId, role, page, limit, EventModel } = options;
+
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const offset = (pageNum - 1) * limitNum;
+
+    const whereClause = {};
+    if (role === "admin") {
+        whereClause.creatorId = userId;
+    }
+
+    try {
+        const { count, rows } = await EventModel.findAndCountAll({
+            where: whereClause,
+            limit: limitNum,
+            offset,
+            order: [["createdAt", "DESC"]],
         });
 
-        const categorizedEvents = {
-            current: [],
-            thisWeek: [],
-            next: [],
+        return {
+            data: rows,
+            pagination: {
+                totalItems: count,
+                totalPages: Math.ceil(count / limitNum),
+                currentPage: pageNum,
+            },
         };
-
-        for (const event of allUpcomingEvents) {
-            const eventDate = new Date(event.date);
-
-            if (isToday(eventDate)) {
-                categorizedEvents.current.push(event);
-            } else if (isThisWeek(eventDate, { weekStartsOn: 1 })) {
-                categorizedEvents.thisWeek.push(event);
-            } else {
-                categorizedEvents.next.push(event);
-            }
-        }
-
-        const finalResult = {
-            current: categorizedEvents.current,
-            thisWeek: categorizedEvents.thisWeek,
-            next: categorizedEvents.next,
-        };
-
-        return finalResult;
     } catch (error) {
-        console.error("Gagal mengambil data event terkategori:", error);
+        logger.error("Gagal mengambil data event: ", error);
         throw error;
     }
 };
@@ -65,18 +117,44 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
     const { UserModel, EventModel, NotificationModel } = model;
     const { eventName, date, startTime, endTime, location, speaker } = data;
     const eventId = uuidv7();
-    const { mainEventFolderPath, fullFolderPath, fileName } =
-        generateEventAssetPaths(eventId);
+    const { fullFolderPath, fileName } = generateEventAssetPaths(eventId);
 
     let uploadResult;
     try {
-        console.log(`Uploading to folder: ${fullFolderPath}`);
+        logger.info(`Creating event: ${eventName} for user: ${userId}`);
+        logger.info(`Uploading to folder: ${fullFolderPath}`);
+
         uploadResult = await uploadPosterImage(file.buffer, {
             folder: fullFolderPath,
             public_id: fileName,
         });
 
+        logger.info(`Upload successful: ${uploadResult.secure_url}`);
+
+        let creatorName;
         const newEvent = await sequelize.transaction(async (t) => {
+            const [creator, superAdmins] = await Promise.all([
+                UserModel.findByPk(userId, {
+                    attributes: ["firstName"],
+                    transaction: t,
+                }),
+                UserModel.findAll({
+                    where: { role: "super_admin" },
+                    attributes: ["id"],
+                    transaction: t,
+                }),
+            ]);
+
+            if (!creator) {
+                throw new AppError(
+                    "User tidak ditemukan",
+                    404,
+                    "USER_NOT_FOUND"
+                );
+            }
+
+            creatorName = creator.firstName;
+
             const event = await EventModel.create(
                 {
                     id: eventId,
@@ -90,21 +168,14 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
                     status: "pending",
                     imageUrl: uploadResult.secure_url,
                     imagePublicId: uploadResult.public_id,
-                    imageFolderPath: mainEventFolderPath,
                 },
                 { transaction: t }
             );
 
-            const superAdmins = await UserModel.findAll({
-                where: { role: "super_admin" },
-                attributes: ["id"],
-                transaction: t,
-            });
-
-            const notifications = superAdmins.map((admin) => ({
+            const notificationForSuperAdmin = superAdmins.map((supAdmin) => ({
                 eventId: event.id,
                 senderId: userId,
-                recipientId: admin.id,
+                recipientId: supAdmin.id,
                 notificationType: "event_created",
                 payload: {
                     eventName: event.eventName,
@@ -116,7 +187,27 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
                 },
             }));
 
-            await NotificationModel.bulkCreate(notifications, {
+            const notificationForCreator = {
+                eventId: event.id,
+                senderId: userId,
+                recipientId: userId,
+                notificationType: "event_pending",
+                payload: {
+                    eventName: event.eventName,
+                    startTime: event.startTime,
+                    date: event.date,
+                    location: event.location,
+                    speaker: event.speaker,
+                    imageUrl: event.imageUrl,
+                },
+            };
+
+            const allNotification = [
+                ...notificationForSuperAdmin,
+                notificationForCreator,
+            ];
+
+            await NotificationModel.bulkCreate(allNotification, {
                 transaction: t,
             });
 
@@ -124,79 +215,155 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
         });
 
         const io = socketService.getIO();
-        io.to("super_admin-room").emit("notifySuperAdmin", {
-            message: "Admin membuat event baru",
+        io.to("super_admin-room").emit("new_notification", {
+            type: "event_created",
+            title: "A new request has been submitted",
+            message: `${creatorName} has submitted a request for the event: ${newEvent.eventName}. Please review it.`,
+            isRead: false,
             data: newEvent,
         });
 
+        io.to(userId).emit("new_notification", {
+            type: "event_pending",
+            title: "Your Request is currently PENDING",
+            message: "We will inform you of the outcome as soon as possible.",
+            isRead: false,
+            data: newEvent,
+        });
+
+        logger.info(`Upload successful: ${uploadResult.secure_url}`);
         return newEvent;
     } catch (error) {
+        logger.error("Event creation failed:", {
+            userId,
+            eventName,
+            error: error.message,
+            uploadResult: uploadResult?.public_id || "none",
+        });
+
         if (uploadResult) {
-            console.log(
+            logger.info(
                 `Database save failed. Deleting uploaded image: ${uploadResult.public_id}`
             );
-            await deleteImage(uploadResult.public_id);
+            await deleteSingleFile(uploadResult.public_id);
         }
 
         throw error;
     }
 };
 
-export const handleDeleteEvent = async (eventId, adminId, EventModel) => {
+export const handleDeleteEvent = async (adminId, eventId, model) => {
+    const { UserModel, EventModel, NotificationModel } = model;
+
+    let eventDataForCleanupAndNotify;
+    let adminName;
     try {
-        const result = await sequelize.transaction(async (t) => {
+        await sequelize.transaction(async (t) => {
             const event = await EventModel.findOne({
                 where: { id: eventId, creatorId: adminId },
-                attributes: ["id", "imagePublicId"],
+                include: [
+                    {
+                        model: UserModel,
+                        as: "creator",
+                        attributes: ["firstName"],
+                    },
+                ],
                 transaction: t,
             });
 
             if (!event) {
-                const eventExists = await EventModel.findByPk(eventId, {
-                    transaction: t,
-                });
-
-                if (!eventExists) {
-                    throw new AppError(
-                        "Event tidak ditemukan",
-                        404,
-                        "EVENT_NOT_FOUND"
-                    );
-                } else {
-                    throw new AppError(
-                        "Anda tidak memiliki akses untuk menghapus event ini",
-                        403,
-                        "FORBIDDEN"
-                    );
-                }
+                throw new AppError(
+                    "Event tidak ditemukan atau Anda tidak berhak mengubahnya.",
+                    404,
+                    "NOT_FOUND"
+                );
             }
 
-            if (event.imagePublicId) {
-                const parts = event.imagePublicId.split("/");
-                const imageFolderPath = parts.slice(0, 3).join("/");
-                await deleteImage(imageFolderPath);
-            }
-
-            await EventModel.destroy({
-                where: { id: event.id },
+            const superAdmins = await UserModel.findAll({
+                where: { role: "super_admin" },
+                attributes: ["id"],
                 transaction: t,
             });
 
-            return true;
+            eventDataForCleanupAndNotify = event.toJSON();
+            adminName = event.creator.firstName;
+
+            const notifications = superAdmins.map((superAdmin) => ({
+                eventId: eventDataForCleanupAndNotify.id,
+                senderId: adminId,
+                recipientId: superAdmin.id,
+                notificationType: "event_deleted",
+                payload: {
+                    eventName: eventDataForCleanupAndNotify.eventName,
+                    time: eventDataForCleanupAndNotify.time,
+                    date: eventDataForCleanupAndNotify.date,
+                    location: eventDataForCleanupAndNotify.location,
+                    speaker: eventDataForCleanupAndNotify.speaker,
+                    imageUrl: eventDataForCleanupAndNotify.imageUrl,
+                },
+            }));
+
+            await NotificationModel.bulkCreate(notifications, {
+                transaction: t,
+            });
+
+            await event.destroy({ transaction: t });
         });
 
-        return result;
-    } catch (error) {
-        console.error("Gagal menghapus data:", error);
-        throw error;
+        if (eventDataForCleanupAndNotify?.imagePublicId) {
+            try {
+                const publicId = eventDataForCleanupAndNotify.imagePublicId;
+
+                if (!publicId || typeof publicId !== "string") {
+                    logger.warn("Invalid publicId format:", publicId);
+                    return true;
+                }
+
+                const parts = publicId.split("/");
+                if (parts.length < 2) {
+                    logger.warn("PublicId format tidak sesuai:", publicId);
+                    return true;
+                }
+
+                parts.pop();
+                parts.pop();
+                const folderPath = parts.join("/");
+
+                if (folderPath) {
+                    await deleteEventFolder(folderPath);
+                    logger.info(
+                        `Cloud folder deleted successfully: ${folderPath}`
+                    );
+                }
+            } catch (cloudError) {
+                logger.error("Cloud deletion failed:", {
+                    eventId: eventDataForCleanupAndNotify.id,
+                    publicId: eventDataForCleanupAndNotify.imagePublicId,
+                    error: cloudError.message,
+                });
+            }
+        }
+
+        if (eventDataForCleanupAndNotify) {
+            const io = socketService.getIO();
+            io.to("super_admin-room").emit("new_notification", {
+                type: "event_deleted",
+                title: `Event "${eventDataForCleanupAndNotify.eventName}" has been deleted.`,
+                message: `${adminName} removed this event from the system. No further action is required`,
+                data: eventDataForCleanupAndNotify,
+            });
+        }
+
+        return true;
+    } catch (dbError) {
+        logger.error("Gagal menghapus data dari database:", dbError.message);
+        throw dbError;
     }
 };
 
 export const sendFeedback = async (eventId, superAdminId, feedback, model) => {
     const { EventModel, NotificationModel } = model;
     try {
-        const io = socketService.getIO();
-
         const feedbackResult = await sequelize.transaction(async (t) => {
             const event = await EventModel.findByPk(eventId, {
                 transaction: t,
@@ -205,45 +372,43 @@ export const sendFeedback = async (eventId, superAdminId, feedback, model) => {
                 throw new AppError("Event tidak ditemukan", 404, "NOT_FOUND");
             }
 
-            const savedNotification = await NotificationModel.create(
-                {
-                    eventId,
-                    senderId: superAdminId,
-                    recipientId: event.creatorId,
-                    notificationType: "event_revised",
-                    feedback,
-                    payload: {
-                        eventName: event.eventName,
-                        time: event.time,
-                        date: event.date,
-                        location: event.location,
-                        speaker: event.speaker,
-                        imageUrl: event.imageUrl,
-                    },
+            await event.update({ status: "revised" }, { transaction: t });
+
+            const notifications = {
+                eventId,
+                senderId: superAdminId,
+                recipientId: event.creatorId,
+                notificationType: "event_revised",
+                feedback,
+                payload: {
+                    eventName: event.eventName,
+                    time: event.time,
+                    date: event.date,
+                    location: event.location,
+                    speaker: event.speaker,
+                    imageUrl: event.imageUrl,
                 },
+            };
+
+            const newNotification = await NotificationModel.create(
+                notifications,
                 { transaction: t }
             );
 
-            await EventModel.update(
-                {
-                    status: "revised",
-                },
-                {
-                    where: { id: eventId },
-                    transaction: t,
-                }
-            );
-            return savedNotification;
+            return newNotification;
         });
 
-        io.to(feedbackResult.recipientId).emit("eventRevised", {
-            message: "Event anda direvisi oleh Super Admin",
+        const io = socketService.getIO();
+        io.to(feedbackResult.recipientId).emit("new_notification", {
+            type: "event_revised",
+            title: "Your Request requires REVISION",
+            message: "Please review the provided Feedback",
             data: feedbackResult,
         });
 
         return feedbackResult;
     } catch (error) {
-        console.error("Gagal mengirim feedback:", error.message);
+        logger.error("Gagal mengirim feedback:", error.message);
         throw error;
     }
 };
@@ -259,11 +424,10 @@ export const editEventService = async (
 
     let uploadResult;
     try {
-        const { mainEventFolderPath, fullFolderPath, fileName } =
-            generateEventAssetPaths(eventId);
+        const { fullFolderPath, fileName } = generateEventAssetPaths(eventId);
 
         if (image) {
-            console.log(`Uploading to folder: ${fullFolderPath}`);
+            logger.info(`Uploading to folder: ${fullFolderPath}`);
             uploadResult = await uploadPosterImage(image.buffer, {
                 folder: fullFolderPath,
                 public_id: fileName,
@@ -277,23 +441,11 @@ export const editEventService = async (
             });
 
             if (!event) {
-                const eventExists = await EventModel.findByPk(eventId, {
-                    transaction: t,
-                });
-
-                if (!eventExists) {
-                    throw new AppError(
-                        "Event tidak ditemukan",
-                        404,
-                        "EVENT_NOT_FOUND"
-                    );
-                } else {
-                    throw new AppError(
-                        "Anda tidak memiliki akses untuk mengubah event ini",
-                        403,
-                        "FORBIDDEN"
-                    );
-                }
+                throw new AppError(
+                    "Event tidak ditemukan atau Anda tidak berhak mengubahnya.",
+                    404,
+                    "NOT_FOUND"
+                );
             }
 
             const dataToUpdate = image
@@ -301,14 +453,13 @@ export const editEventService = async (
                       ...data,
                       imageUrl: uploadResult.secure_url,
                       imagePublicId: uploadResult.public_id,
-                      imageFolderPath: mainEventFolderPath,
                   }
                 : data;
 
             await event.update(
                 {
                     ...dataToUpdate,
-                    status: "revised",
+                    status: "pending",
                 },
                 { transaction: t }
             );
@@ -319,14 +470,14 @@ export const editEventService = async (
                 transaction: t,
             });
 
-            console.log("Data yang mau diupdate adalah ", dataToUpdate);
+            logger.info("Data yang mau diupdate adalah ", dataToUpdate);
 
             const updatedPayloadData = { ...event.dataValues, ...dataToUpdate };
-            const notifications = superAdmins.map((superAdmin) => ({
+            const notificationForSuperAdmin = superAdmins.map((superAdmin) => ({
                 eventId: event.id,
                 senderId: adminId,
                 recipientId: superAdmin.id,
-                notificationType: "event_revised",
+                notificationType: "event_updated",
                 payload: {
                     eventName: updatedPayloadData.eventName,
                     time: updatedPayloadData.time,
@@ -337,7 +488,27 @@ export const editEventService = async (
                 },
             }));
 
-            await NotificationModel.bulkCreate(notifications, {
+            const notificationForCreator = {
+                eventId: event.id,
+                senderId: adminId,
+                recipientId: adminId,
+                notificationType: "event_pending",
+                payload: {
+                    eventName: updatedPayloadData.eventName,
+                    time: updatedPayloadData.time,
+                    date: updatedPayloadData.date,
+                    location: updatedPayloadData.location,
+                    speaker: updatedPayloadData.speaker,
+                    imageUrl: updatedPayloadData.imageUrl,
+                },
+            };
+
+            const allNotification = [
+                ...notificationForSuperAdmin,
+                notificationForCreator,
+            ];
+
+            await NotificationModel.bulkCreate(allNotification, {
                 transaction: t,
             });
 
@@ -350,16 +521,24 @@ export const editEventService = async (
             data: updatedEvent,
         });
 
+        io.to(updatedEvent.creatorId).emit("new_notification", {
+            type: "event_pending",
+            title: "Your Request is currently PENDING",
+            message: "We will inform you of the outcome as soon as possible.",
+            isRead: false,
+            data: updatedEvent,
+        });
+
         return updatedEvent;
     } catch (error) {
         if (uploadResult) {
-            console.log(
+            logger.info(
                 `Database transaction failed. Deleting uploaded image: ${uploadResult.public_id}`
             );
-            await deleteImage(uploadResult.public_id);
+            await deleteSingleFile(uploadResult.public_id);
         }
 
-        console.error("Gagal mengedit event:", error.message);
+        logger.error("Gagal mengedit event:", error.message);
         throw error;
     }
 };
@@ -375,7 +554,7 @@ export const rejectEventService = async (
     try {
         const rejectEventResult = await sequelize.transaction(async (t) => {
             const event = await EventModel.findOne({
-                where: { id: eventId },
+                where: { id: eventId, status: ["pending", "revised"] },
                 transaction: t,
             });
 
@@ -387,12 +566,7 @@ export const rejectEventService = async (
                 );
             }
 
-            await event.update(
-                {
-                    status: "rejected",
-                },
-                { transaction: t }
-            );
+            await event.update({ status: "rejected" }, { transaction: t });
 
             const notifications = {
                 eventId: event.id,
@@ -410,22 +584,25 @@ export const rejectEventService = async (
                 },
             };
 
-            await NotificationModel.create(notifications, {
-                transaction: t,
-            });
+            const newNotification = await NotificationModel.create(
+                notifications,
+                { transaction: t }
+            );
 
-            return event;
+            return newNotification;
         });
 
         const io = socketService.getIO();
-        io.to(rejectEventResult.recipientId).emit("eventRejected", {
-            message: "Your Request has been REJECTED",
+        io.to(rejectEventResult.recipientId).emit("new_notification", {
+            type: "event_rejected",
+            title: "Your Request has been REJECTED",
+            message: `Please review the provided Feedback.`,
             data: rejectEventResult,
         });
 
         return rejectEventResult;
     } catch (error) {
-        console.error("Gagal reject event.", error);
+        logger.error("Gagal reject event.", error);
         throw error;
     }
 };
@@ -436,13 +613,13 @@ export const approveEventService = async (eventId, superAdminId, model) => {
     try {
         const approveEventResult = await sequelize.transaction(async (t) => {
             const event = await EventModel.findOne({
-                where: { id: eventId },
+                where: { id: eventId, status: ["pending", "revised"] },
                 transaction: t,
             });
 
             if (!event) {
                 throw new AppError(
-                    "Data event tidak ditemukan",
+                    "Data event tidak ditemukan atau sudah diproses",
                     404,
                     "NOT_FOUND"
                 );
@@ -470,22 +647,27 @@ export const approveEventService = async (eventId, superAdminId, model) => {
                 },
             };
 
-            await NotificationModel.create(notifications, {
-                transaction: t,
-            });
+            const newNotification = await NotificationModel.create(
+                notifications,
+                {
+                    transaction: t,
+                }
+            );
 
-            return event;
+            return newNotification;
         });
 
         const io = socketService.getIO();
-        io.to(approveEventResult.recipientId).emit("eventApproved", {
-            message: "Your Request has been APPROVED",
+        io.to(approveEventResult.recipientId).emit("new_notification", {
+            type: "event_approved",
+            title: "Your Request has been APPROVED",
+            message: `Congratulations! Your event "${approveEventResult.payload.eventName}" has been approved.`,
             data: approveEventResult,
         });
 
         return approveEventResult;
     } catch (error) {
-        console.error("Gagal approve event.", error);
+        logger.error("Gagal approve event.", error);
         throw error;
     }
 };

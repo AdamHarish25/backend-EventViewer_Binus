@@ -4,15 +4,12 @@ import AppError from "./AppError.js";
 dotenv.config({ path: "../.env" });
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false,
+    host: "smtp.gmail.com",
+    port: 465,
+    secure: true,
     auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
-    },
-    tls: {
-        ciphers: "SSLv3",
     },
 });
 

@@ -1,4 +1,5 @@
 import AppError from "../utils/AppError.js";
+import logger from "../utils/logger.js";
 
 export const getNotificationService = async (
     userId,
@@ -30,7 +31,7 @@ export const getNotificationService = async (
             },
         };
     } catch (error) {
-        console.error("Gagal mengambil notifikasi:", error);
+        logger.error("Gagal mengambil notifikasi:", error);
         throw error;
     }
 };
@@ -57,7 +58,7 @@ export const markAsReadService = async (
 
         return true;
     } catch (error) {
-        console.error("Gagal menandai notifikasi sebagai dibaca:", error);
+        logger.error("Gagal menandai notifikasi sebagai dibaca:", error);
         throw error;
     }
 };

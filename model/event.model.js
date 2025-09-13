@@ -69,6 +69,7 @@ const eventModel = (sequelize, DataTypes) => {
         {
             tableName: "events",
             timestamps: true,
+            paranoid: true,
             indexes: [
                 {
                     fields: ["status"],
@@ -89,7 +90,6 @@ const eventModel = (sequelize, DataTypes) => {
         Event.hasMany(models.Notification, {
             foreignKey: "eventId",
             as: "notifications",
-            onDelete: "CASCADE",
         });
     };
 

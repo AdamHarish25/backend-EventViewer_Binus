@@ -22,7 +22,6 @@ export async function testDBConnection() {
         await sequelize.authenticate();
         console.log("✅ Koneksi database berhasil!");
     } catch (error) {
-        console.error(error);
-        return res.status(400).json({ message: error.message || "Register failed" });
+        console.error("❌ Gagal koneksi ke database:", error.message);
     }
 }
