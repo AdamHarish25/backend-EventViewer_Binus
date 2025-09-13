@@ -69,7 +69,7 @@ const eventModel = (sequelize, DataTypes) => {
         {
             tableName: "events",
             timestamps: true,
-            paranoid: true,
+            // paranoid: true,
             indexes: [
                 {
                     fields: ["status"],
