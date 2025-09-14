@@ -33,6 +33,7 @@ export const login = async (req, res, next) => {
         };
         const { deviceName } = extractDeviceInfo(req);
 
+        // handleUserLogin akan mengembalikan data user lengkap
         const { user, accessToken, refreshToken } = await handleUserLogin(
             data,
             model,
@@ -41,15 +42,19 @@ export const login = async (req, res, next) => {
 
         res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
-            secure: true,
+            secure: process.env.NODE_ENV === "production", // Lebih aman untuk produksi
             sameSite: "strict",
-            maxAge: 1000 * 60 * 60 * 24 * 7,
+            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 hari
             path: "/",
         });
 
+        // --- PERBAIKAN DI SINI ---
+        // Kirim data user yang relevan termasuk firstName
         res.status(200).json({
             message: "Login Success !",
             userId: user.id,
+            firstName: user.firstName, // <-- Menggunakan properti yang benar
+            email: user.email,
             role: user.role,
             accessToken,
         });

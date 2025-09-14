@@ -44,9 +44,9 @@ export const handleUserLogin = async (data, model, deviceName) => {
         deviceName
     );
 
-    const userProfile = {
+   const userProfile = {
         id: user.id,
-        name: `${user.firstName} ${user.lastName}`,
+        firstName: user.firstName, // <-- Menggunakan properti yang benar
         email: user.email,
         role: user.role,
     };
