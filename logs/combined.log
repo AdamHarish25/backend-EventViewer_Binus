@@ -35,3 +35,6 @@
 {"level":"info","message":"Upload successful: https://res.cloudinary.com/dxpuz7mha/image/upload/v1758016692/events/019951f5-c3ec-774e-90d3-ddc9fe82806b/desain-publikasi/1758016685036.jpg","timestamp":"2025-09-16T09:58:13.435Z"}
 {"level":"info","message":"Cloud folder deleted successfully: events/019951f5-c3ec-774e-90d3-ddc9fe82806b","timestamp":"2025-09-16T09:58:20.365Z"}
 {"date":"2025-09-16","endTime":"20:20:00","eventName":"Newest Events","level":"info","location":"Summarecon Mall Bekasi","message":"Data yang mau diupdate adalah ","speaker":"Adam Harish Abdurrahman","startTime":"17:20:00","timestamp":"2025-09-16T10:08:42.629Z"}
+{"level":"info","message":"Cloud folder deleted successfully: events/01994277-c870-7073-892c-9d4d9d526a40","timestamp":"2025-09-16T10:14:08.288Z"}
+{"level":"info","message":"Cloud folder deleted successfully: events/01994255-d7ec-74b1-a21d-b3c4c5c6bcfb","timestamp":"2025-09-16T10:14:17.207Z"}
+{"level":"info","message":"Cloud folder deleted successfully: events/01994252-46e6-75cd-a510-61446b50e63d","timestamp":"2025-09-16T10:14:47.202Z"}
