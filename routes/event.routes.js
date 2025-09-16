@@ -1,5 +1,6 @@
 import express from "express";
 import dotenv from "dotenv";
+import { resolve } from "path";
 
 import { accessTokenValidator } from "../middleware/tokenValidator.middleware.js";
 import {
@@ -23,7 +24,7 @@ import {
 import uploadPoster from "../middleware/uploadPoster.middleware.js";
 import handleMulter from "../middleware/handleMulter.js";
 
-dotenv.config({ path: "../.env" });
+dotenv.config({ path: resolve(process.cwd(), ".env") });
 
 const { ACCESS_JWT_SECRET } = process.env;
 const router = express.Router();

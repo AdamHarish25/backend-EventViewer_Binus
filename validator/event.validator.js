@@ -13,16 +13,16 @@ const baseEventSchema = Joi.object({
     }),
 
     startTime: Joi.string()
-        .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+        .pattern(/^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/)
         .messages({
             "string.base": "Waktu mulai event harus berupa teks.",
             "string.empty": "Waktu mulai event tidak boleh kosong.",
             "string.pattern.base":
-                "Format waktu mulai tidak valid. Gunakan format HH:MM (misal: 14:30).",
+                "Format waktu mulai tidak valid. Gunakan format HH:MM atau HH:MM:SS.",
         }),
 
     endTime: Joi.string()
-        .pattern(/^([01]\d|2[0-3]):([0-5]\d)$/)
+        .pattern(/^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/)
         .custom((value, helpers) => {
             const data = helpers.state.ancestors[0] || {};
             const { startTime } = data;
@@ -31,8 +31,14 @@ const baseEventSchema = Joi.object({
                 return value;
             }
 
-            const [startHour, startMinute] = startTime.split(":").map(Number);
-            const [endHour, endMinute] = value.split(":").map(Number);
+            const [startHour, startMinute] = startTime
+                .split(":")
+                .slice(0, 2)
+                .map(Number);
+            const [endHour, endMinute] = value
+                .split(":")
+                .slice(0, 2)
+                .map(Number);
 
             const startTotalMinutes = startHour * 60 + startMinute;
             const endTotalMinutes = endHour * 60 + endMinute;
@@ -56,7 +62,7 @@ const baseEventSchema = Joi.object({
             "string.base": "Waktu selesai event harus berupa teks.",
             "string.empty": "Waktu selesai event tidak boleh kosong.",
             "string.pattern.base":
-                "Format waktu selesai tidak valid. Gunakan format HH:MM (misal: 16:30).",
+                "Format waktu selesai tidak valid. Gunakan format HH:MM atau HH:MM:SS.",
             "time.endBeforeStart":
                 "Waktu selesai harus lebih besar dari waktu mulai.",
             "time.durationTooShort": "Durasi event minimal 15 menit.",
@@ -74,8 +80,11 @@ const baseEventSchema = Joi.object({
                 return helpers.error("date.invalid");
             }
 
-            if (startTime && /^\d{2}:\d{2}$/.test(startTime)) {
-                const [hours, minutes] = startTime.split(":").map(Number);
+            if (startTime && /^\d{2}:\d{2}(:\d{2})?$/.test(startTime)) {
+                const [hours, minutes] = startTime
+                    .split(":")
+                    .slice(0, 2)
+                    .map(Number);
                 const eventStartDateTime = new Date(eventDate);
                 eventStartDateTime.setHours(hours, minutes, 0, 0);
 
@@ -161,8 +170,12 @@ const baseEventSchema = Joi.object({
             try {
                 const [startHour, startMinute] = startTime
                     .split(":")
+                    .slice(0, 2)
                     .map(Number);
-                const [endHour, endMinute] = endTime.split(":").map(Number);
+                const [endHour, endMinute] = endTime
+                    .split(":")
+                    .slice(0, 2)
+                    .map(Number);
 
                 const eventDate = new Date(date);
                 const startDateTime = new Date(eventDate);

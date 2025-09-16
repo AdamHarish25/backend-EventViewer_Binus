@@ -187,11 +187,12 @@ export const saveNewEventAndNotify = async (userId, data, file, model) => {
                 },
             }));
 
+            // Temporary: use event_created for creator to avoid enum mismatch on some DBs
             const notificationForCreator = {
                 eventId: event.id,
                 senderId: userId,
                 recipientId: userId,
-                notificationType: "event_pending",
+                notificationType: "event_created",
                 payload: {
                     eventName: event.eventName,
                     startTime: event.startTime,
@@ -279,34 +280,16 @@ export const handleDeleteEvent = async (adminId, eventId, model) => {
                 );
             }
 
-            const superAdmins = await UserModel.findAll({
-                where: { role: "super_admin" },
-                attributes: ["id"],
-                transaction: t,
-            });
-
             eventDataForCleanupAndNotify = event.toJSON();
             adminName = event.creator.firstName;
 
-            const notifications = superAdmins.map((superAdmin) => ({
-                eventId: eventDataForCleanupAndNotify.id,
-                senderId: adminId,
-                recipientId: superAdmin.id,
-                notificationType: "event_deleted",
-                payload: {
-                    eventName: eventDataForCleanupAndNotify.eventName,
-                    time: eventDataForCleanupAndNotify.time,
-                    date: eventDataForCleanupAndNotify.date,
-                    location: eventDataForCleanupAndNotify.location,
-                    speaker: eventDataForCleanupAndNotify.speaker,
-                    imageUrl: eventDataForCleanupAndNotify.imageUrl,
-                },
-            }));
-
-            await NotificationModel.bulkCreate(notifications, {
+            // Hapus seluruh notifikasi yang berelasi dengan event ini agar penghapusan tidak terblokir FK
+            await NotificationModel.destroy({
+                where: { eventId: event.id },
                 transaction: t,
             });
 
+            // Hapus event
             await event.destroy({ transaction: t });
         });
 
@@ -349,14 +332,33 @@ export const handleDeleteEvent = async (adminId, eventId, model) => {
             io.to("super_admin-room").emit("new_notification", {
                 type: "event_deleted",
                 title: `Event "${eventDataForCleanupAndNotify.eventName}" has been deleted.`,
-                message: `${adminName} removed this event from the system. No further action is required`,
+                message:
+                    `${adminName} removed this event from the system. No further action is required`,
                 data: eventDataForCleanupAndNotify,
             });
         }
 
         return true;
     } catch (dbError) {
-        logger.error("Gagal menghapus data dari database:", dbError.message);
+        // Log full error details for diagnostics
+        logger.error("Gagal menghapus data dari database:", dbError);
+
+        // Translate common FK constraint errors into a client-friendly response
+        const mysqlCode = dbError?.original?.code;
+        const isFkConstraint =
+            dbError?.name === "SequelizeForeignKeyConstraintError" ||
+            mysqlCode === "ER_ROW_IS_REFERENCED_2" ||
+            mysqlCode === "ER_ROW_IS_REFERENCED";
+
+        if (isFkConstraint) {
+            throw new AppError(
+                "Tidak dapat menghapus event karena masih memiliki relasi data (notifikasi).",
+                409,
+                "FK_CONSTRAINT"
+            );
+        }
+
+        // Fallback: propagate original error
         throw dbError;
     }
 };
@@ -477,7 +479,7 @@ export const editEventService = async (
                 eventId: event.id,
                 senderId: adminId,
                 recipientId: superAdmin.id,
-                notificationType: "event_updated",
+                notificationType: "event_created",
                 payload: {
                     eventName: updatedPayloadData.eventName,
                     time: updatedPayloadData.time,
@@ -492,7 +494,7 @@ export const editEventService = async (
                 eventId: event.id,
                 senderId: adminId,
                 recipientId: adminId,
-                notificationType: "event_pending",
+                notificationType: "event_created",
                 payload: {
                     eventName: updatedPayloadData.eventName,
                     time: updatedPayloadData.time,

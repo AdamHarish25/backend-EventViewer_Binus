@@ -45,7 +45,7 @@ export const schemaValidator = (schemas) => {
             next(
                 new AppError(
                     "Invalid request data",
-                    401,
+                    400,
                     "VALIDATION_ERROR",
                     errors
                 )
