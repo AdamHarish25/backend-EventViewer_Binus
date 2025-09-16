@@ -38,3 +38,12 @@
 {"level":"info","message":"Cloud folder deleted successfully: events/01994277-c870-7073-892c-9d4d9d526a40","timestamp":"2025-09-16T10:14:08.288Z"}
 {"level":"info","message":"Cloud folder deleted successfully: events/01994255-d7ec-74b1-a21d-b3c4c5c6bcfb","timestamp":"2025-09-16T10:14:17.207Z"}
 {"level":"info","message":"Cloud folder deleted successfully: events/01994252-46e6-75cd-a510-61446b50e63d","timestamp":"2025-09-16T10:14:47.202Z"}
+{"level":"info","message":"Creating event: Night Club House for user: 0198bb1b-4cb1-7e98-b47e-b7f33b7a00ef","timestamp":"2025-09-16T10:26:37.668Z"}
+{"level":"info","message":"Uploading to folder: events/0199520f-e5e4-72d2-8d6e-69caf44e0e5f/desain-publikasi","timestamp":"2025-09-16T10:26:37.669Z"}
+{"level":"info","message":"Creating event: Night Club House for user: 0198bb1b-4cb1-7e98-b47e-b7f33b7a00ef","timestamp":"2025-09-16T10:26:38.394Z"}
+{"level":"info","message":"Uploading to folder: events/0199520f-e8ba-7177-af1e-7b0aca25f580/desain-publikasi","timestamp":"2025-09-16T10:26:38.395Z"}
+{"level":"info","message":"Upload successful: https://res.cloudinary.com/dxpuz7mha/image/upload/v1758018400/events/0199520f-e8ba-7177-af1e-7b0aca25f580/desain-publikasi/1758018398394.png","timestamp":"2025-09-16T10:26:41.316Z"}
+{"level":"info","message":"Upload successful: https://res.cloudinary.com/dxpuz7mha/image/upload/v1758018400/events/0199520f-e5e4-72d2-8d6e-69caf44e0e5f/desain-publikasi/1758018397668.png","timestamp":"2025-09-16T10:26:41.321Z"}
+{"level":"info","message":"Upload successful: https://res.cloudinary.com/dxpuz7mha/image/upload/v1758018400/events/0199520f-e8ba-7177-af1e-7b0aca25f580/desain-publikasi/1758018398394.png","timestamp":"2025-09-16T10:26:41.368Z"}
+{"level":"info","message":"Upload successful: https://res.cloudinary.com/dxpuz7mha/image/upload/v1758018400/events/0199520f-e5e4-72d2-8d6e-69caf44e0e5f/desain-publikasi/1758018397668.png","timestamp":"2025-09-16T10:26:41.371Z"}
+{"level":"info","message":"Cloud folder deleted successfully: events/0199520f-e5e4-72d2-8d6e-69caf44e0e5f","timestamp":"2025-09-16T10:26:51.139Z"}
