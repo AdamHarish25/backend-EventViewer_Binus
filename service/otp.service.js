@@ -34,10 +34,11 @@ const validateOTPFormat = (otp) => {
 
 export const validateOTP = async (user, otp, model) => {
     const { OTPModel } = model;
-    const isUserExist = await UserModel.findOne({ where: { email } });
-    if (!isUserExist) {
-        throw new AppError("Email tidak terdaftar", 404, "USER_NOT_FOUND");
-    }
+    // Remove this check as user is already validated in controller
+    // const isUserExist = await UserModel.findOne({ where: { email } });
+    // if (!isUserExist) {
+    //     throw new AppError("Email tidak terdaftar", 404, "USER_NOT_FOUND");
+    // }
 
     validateOTPFormat(otp);
 

@@ -42,7 +42,7 @@ const OTPModel = (sequelize, DataTypes) => {
         },
         {
             tableName: "otps",
-            timestamps: true,
+            timestamps: false, // Disable timestamps karena database tidak memiliki kolom updatedAt
             indexes: [
                 {
                     name: "otp_verification_idx",
